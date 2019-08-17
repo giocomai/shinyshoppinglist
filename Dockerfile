@@ -6,6 +6,12 @@ RUN R -e "remotes::install_github('hadley/emo')"
 
 COPY shiny-customized.config /etc/shiny-server/shiny-server.conf
 
+RUN rm -rf /srv/shiny-server/
+RUN mkdir -p /srv/shiny-server
 COPY shiny/ /srv/shiny-server/
+RUN mkdir -p /srv/shiny-server/items
+RUN chown -R shiny:shiny /srv/shiny-server/items
+
+VOLUME /srv/shiny-server/
 
 
