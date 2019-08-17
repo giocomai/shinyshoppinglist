@@ -11,7 +11,7 @@ dir.create(path = "items", showWarnings = FALSE)
 
 ui <- fluidPage(
   
-  titlePanel("Shopping list"),
+  titlePanel(title = "Shopping list"),
   
   sidebarLayout(sidebarPanel(
     tags$head(tags$script(src = "enter.js")),
@@ -26,8 +26,15 @@ ui <- fluidPage(
   mainPanel(shiny::h2("Buy"),
             DT::DTOutput(outputId = "current_list_buy"),
             shiny::h2("Bought"),
-            DT::DTOutput(outputId = "current_list_bought"))
-  
+            DT::DTOutput(outputId = "current_list_bought"),
+            shiny::hr(),
+            shinyWidgets::switchInput(inputId = "add_remove_switch",
+                                      value = TRUE,
+                                      onLabel = "Buy/Bought",
+                                      offLabel = "Remove items",
+                                      size = "small",
+                                      inline = FALSE)
+  )
   )
 )
 
@@ -69,7 +76,7 @@ server <- function(input, output, session) {
                     inputId = "add_item",
                     value = paste(emo::ji("apple"), ""))
   })
-
+  
   
   shiny::observeEvent(input$fridge, {
     updateTextInput(session = session,
@@ -88,16 +95,8 @@ server <- function(input, output, session) {
                     inputId = "add_item",
                     value = paste(emo::ji("canned_food"), ""))
   })
-
-  output$current_list_buy <- renderDT(expr =  shopping_list() %>% na.omit() %>% filter(Buy == TRUE) %>% select(Item) %>% dplyr::arrange(Item),
-                                  server = TRUE,
-                                  options = list(pageLength = 5000,
-                                                 rowReorder = TRUE,
-                                                 dom = "t"),
-                                  rownames= FALSE,
-                                  colnames = NULL)
   
-  output$current_list_bought <- renderDT(expr =  shopping_list() %>% na.omit() %>% filter(Buy == FALSE) %>% select(Item) %>% dplyr::arrange(Item),
+  output$current_list_buy <- renderDT(expr =  shopping_list() %>% na.omit() %>% filter(Buy == TRUE) %>% select(Item) %>% dplyr::arrange(Item),
                                       server = TRUE,
                                       options = list(pageLength = 5000,
                                                      rowReorder = TRUE,
@@ -105,11 +104,22 @@ server <- function(input, output, session) {
                                       rownames= FALSE,
                                       colnames = NULL)
   
+  output$current_list_bought <- renderDT(expr =  shopping_list() %>% na.omit() %>% filter(Buy == FALSE) %>% select(Item) %>% dplyr::arrange(Item),
+                                         server = TRUE,
+                                         options = list(pageLength = 5000,
+                                                        rowReorder = TRUE,
+                                                        dom = "t"),
+                                         rownames= FALSE,
+                                         colnames = NULL)
+  
   shiny::observeEvent(input$current_list_buy_rows_selected, {
     
     if (is.null(input$current_list_buy_rows_selected)==FALSE) {
       if (length(input$current_list_buy_rows_selected)>0) {
         item_file_location <- file.path("items", paste0(tolower(stringr::str_squish(stringr::str_replace_all(shopping_list() %>% filter(Buy == TRUE) %>% dplyr::arrange(Item) %>% slice(input$current_list_buy_rows_selected) %>% pull(Item), "[^[:alnum:]]", " "))), ".csv"))
+        if (input$add_remove_switch==FALSE) {
+          unlink(item_file_location)
+        } else {
         readr::read_csv(file = item_file_location,
                         col_types = cols(
                           Item = col_character(),
@@ -117,6 +127,7 @@ server <- function(input, output, session) {
                         )) %>% 
           mutate(Buy = !Buy) %>% 
           write_csv(path = item_file_location)
+        }
       }
     }
     
@@ -127,29 +138,33 @@ server <- function(input, output, session) {
     if (is.null(input$current_list_bought_rows_selected)==FALSE) {
       if (length(input$current_list_bought_rows_selected)>0) {
         item_file_location <- file.path("items", paste0(tolower(stringr::str_squish(str_replace_all(shopping_list() %>% filter(Buy == FALSE) %>% dplyr::arrange(Item) %>% slice(input$current_list_bought_rows_selected) %>% pull(Item), "[^[:alnum:]]", " "))), ".csv"))
-        readr::read_csv(file = item_file_location, col_types = cols(
-          Item = col_character(),
-          Buy = col_logical()
-        )) %>% 
-          mutate(Buy = !Buy) %>% 
-          write_csv(path = item_file_location)
+        if (input$add_remove_switch==FALSE) {
+          unlink(item_file_location)
+        } else {
+          readr::read_csv(file = item_file_location, col_types = cols(
+            Item = col_character(),
+            Buy = col_logical()
+          )) %>% 
+            mutate(Buy = !Buy) %>% 
+            write_csv(path = item_file_location)
+        }
       }
     }
     
   })
   
   shopping_list <- reactivePoll(1000, session,
-                       # This function returns the time that any item was last modified
-                       checkFunc = function() {
-                         purrr::map(.x = list.files(path = "items", full.names = TRUE), .f = file.mtime)
-                       },
-                       # This function returns the content of all items
-                       valueFunc = function() {
-                         purrr::map_df(.x = list.files(path = "items", pattern = "csv", full.names = TRUE), .f = read_csv, col_types = cols(
-                           Item = col_character(),
-                           Buy = col_logical()
-                         ))
-                       }
+                                # This function returns the time that any item was last modified
+                                checkFunc = function() {
+                                  purrr::map(.x = list.files(path = "items", full.names = TRUE), .f = file.mtime)
+                                },
+                                # This function returns the content of all items
+                                valueFunc = function() {
+                                  purrr::map_df(.x = list.files(path = "items", pattern = "csv", full.names = TRUE), .f = read_csv, col_types = cols(
+                                    Item = col_character(),
+                                    Buy = col_logical()
+                                  ))
+                                }
   )
   
 }
