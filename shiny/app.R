@@ -19,7 +19,6 @@ ui <- fluidPage(
     actionButton("add_item_now", "Add item"),
     actionButton("veggie", emo::ji("apple")),
     actionButton("fridge", emo::ji("snowflake")),
-    actionButton("canned_food", emo::ji("canned_food")),
     actionButton("bread", emo::ji("bread")),
     actionButton("soap", emo::ji("soap"))
   )
