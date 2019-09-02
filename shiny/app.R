@@ -23,14 +23,14 @@ ui <- fluidPage(
     actionButton("soap", emo::ji("soap"))
   )
   ,
-  mainPanel(shiny::h2("Buy"),
+  mainPanel(shiny::h2("To buy"),
             DT::DTOutput(outputId = "current_list_buy"),
             shiny::h2("Bought"),
             DT::DTOutput(outputId = "current_list_bought"),
             shiny::hr(),
             shinyWidgets::switchInput(inputId = "add_remove_switch",
                                       value = TRUE,
-                                      onLabel = "Buy/Bought",
+                                      onLabel = "To buy/Bought",
                                       offLabel = "Remove items",
                                       size = "small",
                                       inline = FALSE)
@@ -48,8 +48,8 @@ server <- function(input, output, session) {
                                                       full.names = TRUE),
                                       .f = readr::read_csv,
                                       col_types = cols(
-                                        Item = col_character(),
-                                        Buy = col_logical()
+                                        Item = readr::col_character(),
+                                        Buy = readr::col_logical()
                                       ))
   
   
@@ -60,9 +60,10 @@ server <- function(input, output, session) {
   })
   
   shiny::observeEvent(input$add_item_now, {
-    item_file_location <- file.path("items", paste0(tolower(stringr::str_squish(stringr::str_replace_all(input$add_item, "[^[:alnum:]]", " "))), ".csv"))
+    item_file_location <- file.path("items",
+                                    paste0(tolower(stringr::str_squish(stringr::str_replace_all(input$add_item, "[^[:alnum:]]", " "))), ".csv"))
     readr::write_csv(x = tibble(Item = input$add_item, Buy = TRUE), path = item_file_location)
-    updateTextInput(session = session, inputId = "add_item", value = "")
+    shiny::updateTextInput(session = session, inputId = "add_item", value = "")
   })
   
   shiny::observeEvent(input$bread, {
@@ -96,7 +97,11 @@ server <- function(input, output, session) {
                     value = paste(emo::ji("canned_food"), ""))
   })
   
-  output$current_list_buy <- renderDT(expr =  shopping_list() %>% na.omit() %>% filter(Buy == TRUE) %>% select(Item) %>% dplyr::arrange(Item),
+  output$current_list_buy <- renderDT(expr =  shopping_list() %>%
+                                        na.omit() %>% 
+                                        dplyr::filter(Buy == TRUE) %>% 
+                                        dplyr::select(Item) %>%
+                                        dplyr::arrange(Item),
                                       server = TRUE,
                                       options = list(pageLength = 5000,
                                                      rowReorder = TRUE,
@@ -104,7 +109,11 @@ server <- function(input, output, session) {
                                       rownames= FALSE,
                                       colnames = NULL)
   
-  output$current_list_bought <- renderDT(expr =  shopping_list() %>% na.omit() %>% filter(Buy == FALSE) %>% select(Item) %>% dplyr::arrange(Item),
+  output$current_list_bought <- renderDT(expr =  shopping_list() %>%
+                                           na.omit() %>%
+                                           dplyr::filter(Buy == FALSE) %>%
+                                           dplyr::select(Item) %>%
+                                           dplyr::arrange(Item),
                                          server = TRUE,
                                          options = list(pageLength = 5000,
                                                         rowReorder = TRUE,
@@ -116,17 +125,25 @@ server <- function(input, output, session) {
     
     if (is.null(input$current_list_buy_rows_selected)==FALSE) {
       if (length(input$current_list_buy_rows_selected)>0) {
-        item_file_location <- file.path("items", paste0(tolower(stringr::str_squish(stringr::str_replace_all(shopping_list() %>% filter(Buy == TRUE) %>% dplyr::arrange(Item) %>% slice(input$current_list_buy_rows_selected) %>% pull(Item), "[^[:alnum:]]", " "))), ".csv"))
+        item_file_location <- file.path("items",
+                                        paste0(tolower(stringr::str_squish(stringr::str_replace_all(shopping_list() %>%
+                                                                                                      dplyr::filter(Buy == TRUE) %>%
+                                                                                                      dplyr::arrange(Item) %>%
+                                                                                                      dplyr::slice(input$current_list_buy_rows_selected) %>%
+                                                                                                      dplyr::pull(Item), "[^[:alnum:]]", " "))), ".csv"))
         if (input$add_remove_switch==FALSE) {
-          unlink(item_file_location)
+          purrr::walk(.x = item_file_location, unlink)
         } else {
-        readr::read_csv(file = item_file_location,
-                        col_types = cols(
-                          Item = col_character(),
-                          Buy = col_logical()
-                        )) %>% 
-          mutate(Buy = !Buy) %>% 
-          write_csv(path = item_file_location)
+          purrr::walk(.x = item_file_location,
+                      .f = function(x) {
+                        readr::read_csv(file = x,
+                                        col_types = cols(
+                                          Item = readr::col_character(),
+                                          Buy = readr::col_logical()
+                                        )) %>% 
+                          dplyr::mutate(Buy = !Buy) %>% 
+                          readr::write_csv(path = x)
+                      })
         }
       }
     }
@@ -139,14 +156,17 @@ server <- function(input, output, session) {
       if (length(input$current_list_bought_rows_selected)>0) {
         item_file_location <- file.path("items", paste0(tolower(stringr::str_squish(str_replace_all(shopping_list() %>% filter(Buy == FALSE) %>% dplyr::arrange(Item) %>% slice(input$current_list_bought_rows_selected) %>% pull(Item), "[^[:alnum:]]", " "))), ".csv"))
         if (input$add_remove_switch==FALSE) {
-          unlink(item_file_location)
+          purrr::walk(.x = item_file_location, unlink)
         } else {
-          readr::read_csv(file = item_file_location, col_types = cols(
-            Item = col_character(),
-            Buy = col_logical()
-          )) %>% 
-            mutate(Buy = !Buy) %>% 
-            write_csv(path = item_file_location)
+          purrr::walk(.x = item_file_location,
+                      .f = function(x) {
+                        readr::read_csv(file = x, col_types = cols(
+                          Item = readr::col_character(),
+                          Buy = readr::col_logical()
+                        )) %>% 
+                          dplyr::mutate(Buy = !Buy) %>% 
+                          readr::write_csv(path = x)}
+          )
         }
       }
     }
@@ -161,8 +181,8 @@ server <- function(input, output, session) {
                                 # This function returns the content of all items
                                 valueFunc = function() {
                                   purrr::map_df(.x = list.files(path = "items", pattern = "csv", full.names = TRUE), .f = read_csv, col_types = cols(
-                                    Item = col_character(),
-                                    Buy = col_logical()
+                                    Item = readr::col_character(),
+                                    Buy = readr::col_logical()
                                   ))
                                 }
   )
